@@ -1,0 +1,198 @@
+format ELF64 executable
+
+SYS_exit equ 60
+SYS_write equ 1
+SYS_close equ 3
+SYS_socket equ 41
+SYS_bind equ 49
+SYS_listen equ 50
+SYS_accept equ 43
+SYS_setsockopt equ 54
+
+INADDR_ANY equ 0
+SOCK_STREAM equ 1
+AF_INET equ 2
+
+STDOUT equ 1
+STDERR equ 2
+
+EXIT_SUCCESS equ 0
+EXIT_FAILURE equ 1
+
+MAX_CONNECTIONS equ 10
+TCP_NODELAY equ 1
+IPPROTO_TCP equ 6
+
+struc db [data]
+{
+    common
+    . db data
+    .size = $ - .
+}
+
+macro syscall1 name, arg1
+{
+    mov rax, name
+    mov rdi, arg1
+    syscall
+}
+
+macro syscall2 name, arg1, arg2
+{
+    mov rax, name
+    mov rdi, arg1
+    mov rsi, arg2
+    syscall
+}
+
+macro syscall3 name, arg1, arg2, arg3
+{
+    mov rax, name
+    mov rdi, arg1
+    mov rsi, arg2
+    mov rdx, arg3
+    syscall
+}
+
+macro syscall5 name, arg1, arg2, arg3, arg4, arg5
+{
+    mov rax, name
+    mov rdi, arg1
+    mov rsi, arg2
+    mov rdx, arg3
+    mov r10, arg4
+    mov r8, arg5
+    syscall
+}
+
+macro write output,string, len
+{
+    syscall3 SYS_write, output, string, len
+}
+
+macro exit status
+{
+    syscall1 SYS_exit, status 
+}
+
+macro close fd
+{
+    syscall1 SYS_close, fd
+}
+
+macro socket domain, type, protocol
+{
+    syscall3 SYS_socket, domain, type, protocol
+}
+
+macro bind sockfd, addr, addrlen
+{
+    syscall3 SYS_bind, sockfd, addr, addrlen
+}
+
+macro listen sockfd, backlog
+{
+    syscall2 SYS_listen, sockfd, backlog
+}
+
+macro accept sockfd, addr, addrlen
+{
+    syscall3 SYS_accept, sockfd, addr, addrlen
+}
+
+macro setsockopt sockfd, level, optname, optval, optlen
+{
+    syscall5 SYS_setsockopt, sockfd, level, optname, optval, optlen
+}
+
+segment readable executable
+entry main
+main:
+    write STDOUT, start, start.size
+
+    ;; Create socket fd
+    write STDOUT, socket_msg, socket_msg.size
+    socket AF_INET, SOCK_STREAM, 0
+    cmp rax, 0
+    jl error
+    mov qword [socket_fd], rax
+
+    ;; Set socket options
+    mov dword [optval], 1
+    setsockopt [socket_fd], IPPROTO_TCP, TCP_NODELAY, optval, 4
+
+    ;; Bind socket
+    write STDOUT, bind_msg, bind_msg.size
+    mov word [servaddr.sin_family], AF_INET
+    mov dword [servaddr.sin_addr], INADDR_ANY
+    mov word [servaddr.sin_port], 14619 
+    bind [socket_fd], servaddr.sin_family, sizeof_servaddr 
+    cmp rax, 0
+    jl error
+
+    ;; Listen
+    write STDOUT, listen_msg, listen_msg.size
+    listen [socket_fd], 10
+    cmp rax, 0
+    jl error
+
+next_request:
+    ;; Accept
+    write STDOUT, accept_msg, accept_msg.size
+    accept [socket_fd], clientaddr.sin_family, sizeof_clientaddr
+    cmp rax, 0
+    jl error
+    mov qword [conn_fd], rax
+
+    write [conn_fd], response, response_len
+
+    jmp next_request
+
+    close [conn_fd]
+    close [socket_fd]
+
+    write STDOUT, ok, ok.size
+
+    exit 0
+
+error:
+    write STDERR, error_msg, error_msg.size
+    close [conn_fd]
+    close [socket_fd]
+    exit 1
+
+segment readable writeable
+
+
+struc sockaddr_in
+{
+    .sin_family dw 0
+    .sin_port dw   0
+    .sin_addr dd   0
+    .sin_zero dq   0
+}
+
+socket_fd dq -1
+conn_fd dq -1
+servaddr sockaddr_in
+sizeof_servaddr = $ - servaddr.sin_family
+clientaddr sockaddr_in
+sizeof_clientaddr dd sizeof_servaddr 
+
+ok db "OK", 10
+start db "Starting web server...", 10
+error_msg db "Error", 10
+socket_msg db "Creating socket...", 10
+bind_msg db "Binding socket...", 10
+listen_msg db "Listening...", 10
+accept_msg db "Waiting for client connections... ", 10
+hello db "Hello from assembly", 10
+
+response db "HTTP/1.1 200 OK", 13, 10
+         db "Content-Type: text/html; charset=UTF-8", 13, 10
+         db "Connection: close", 13, 10
+         db 13, 10
+         db "<html><head><title>Assembly</title></head><body><h1>Hello from assembly</h1></body></html>", 13, 10
+response_len = $ - response
+
+optval dd 1
