@@ -18,8 +18,7 @@ main:
     ;; Create socket fd
     write STDOUT, socket_msg, socket_msg.size
     socket AF_INET, SOCK_STREAM, 0
-    cmp rax, 0
-    jl error
+    handle_error 
     mov qword [socket_fd], rax
 
     ;; Set socket options
@@ -32,34 +31,24 @@ main:
     mov dword [servaddr.sin_addr], INADDR_ANY
     mov word [servaddr.sin_port], 14619 
     bind [socket_fd], servaddr.sin_family, sizeof_servaddr 
-    cmp rax, 0
-    jl error
+    handle_error 
 
     ;; Listen
     write STDOUT, listen_msg, listen_msg.size
     listen [socket_fd], 10
-    cmp rax, 0
-    jl error
+    handle_error
 
+    ;; Accept Loop
 next_request:
-    ;; Accept
     write STDOUT, accept_msg, accept_msg.size
     accept [socket_fd], clientaddr.sin_family, sizeof_clientaddr
-    cmp rax, 0
-    jl error
+    handle_error 
     mov qword [conn_fd], rax
 
     write [conn_fd], response, response_len
-
-
     jmp next_request
 
-    close [conn_fd]
-    close [socket_fd]
-    write STDOUT, ok, ok.size
-
-    exit 0
-
+    ;; Error handling
 error:
     write STDERR, error_msg, error_msg.size
     close [conn_fd]

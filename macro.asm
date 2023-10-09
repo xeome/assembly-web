@@ -72,3 +72,9 @@ macro setsockopt sockfd, level, optname, optval, optlen
 {
     syscall5 SYS_setsockopt, sockfd, level, optname, optval, optlen
 }
+
+macro handle_error
+{
+    cmp rax, 0
+    jl error
+}
