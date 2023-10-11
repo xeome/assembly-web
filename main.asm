@@ -1,14 +1,9 @@
+;; A simple web server written in assembly
 format ELF64 executable
 
 include 'macro.asm'
 include 'def.asm'
-
-struc db [data]
-{
-    common
-    . db data
-    .size = $ - .
-}
+include 'struct.asm'
 
 segment readable executable
 entry main
@@ -58,13 +53,6 @@ error:
 segment readable writeable
 
 
-struc sockaddr_in
-{
-    .sin_family dw 0
-    .sin_port dw   0
-    .sin_addr dd   0
-    .sin_zero dq   0
-}
 
 socket_fd dq -1
 conn_fd dq -1

@@ -6,6 +6,7 @@ SYS_bind equ 49
 SYS_listen equ 50
 SYS_accept equ 43
 SYS_setsockopt equ 54
+SYS_read equ 0
 
 INADDR_ANY equ 0
 SOCK_STREAM equ 1
