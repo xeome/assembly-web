@@ -10,3 +10,6 @@ fasm main.asm
 
 And then you can access the web page at
 <http://localhost:6969/>
+
+preview:
+![preview](preview.png)
